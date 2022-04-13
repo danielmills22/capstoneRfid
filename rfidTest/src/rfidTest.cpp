@@ -94,7 +94,7 @@ void loop(void) {
           nfc.PrintHexChar(data, 16);
 
           correctKey = isMatched(uid, masterKey);
-          if (correctKey == true) {
+          if (correctKey) {
             printf("Valid Access Card \n"); 
           }
           else{
