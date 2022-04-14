@@ -49,7 +49,6 @@ void setup(){
 
   // Start I2C transmission
   Wire.beginTransmission(Addr);
-  Wire.beginTransmission(AddrP);
   // Command header byte-1
   Wire.write(0x92);
   // Command header byte-2
@@ -87,7 +86,7 @@ void setup(){
   noOfChannel = data[2];
 
   // Output data to dashboard
-  Serial.printf("Type of Sensor %i \n",typeOfSensor);
+  //Serial.printf("Type of Sensor %i \n",typeOfSensor);
   Serial.printf("Max Current: %i \n", maxCurrent);
   //Serial.printf("No. of Channels: %i 'n", noOfChannel);
   //delay(5000);
@@ -100,7 +99,7 @@ void loop()
   delay(100);
   for(i=0;i<4096;i++) {
     // Start I2C transmission
-    //Wire.beginTransmission(AddrP);  
+    Wire.beginTransmission(AddrP);  
     // Calling conversion result register, 0x00(0)
     Wire.write(0x00);
     // Stop I2C transmission
@@ -121,6 +120,9 @@ void loop()
 
     vibdat[i][0] = micros();
     vibdat[i][1] = raw_adc;
+
+
+    Serial.printf("%i,%i\n",millis(), raw_adc);
     //delay(9);
     
 }
@@ -159,7 +161,7 @@ void loop()
     Wire.write((0x92 + 0x6A + 0x01 + j + j + 0x00 + 0x00) & 0xFF);
     // Stop I2C Transmission
     Wire.endTransmission();
-    delay(500);
+    delay(100);
 
     // Request 3 bytes of data
     Wire.requestFrom(Addr, 3);
@@ -175,9 +177,9 @@ void loop()
     current = current / 1000;
 
     // Output data to dashboard
-    Serial.printf("Channel: %i \n", j);
-    Serial.printf("Current Value: %0.2f \n", current); 
-    pSensor = current;
+    //Serial.printf("Channel: %i \n", j);
+    //Serial.printf("%0.2f \n", current); 
+    //pSensor = current;
     //Particle.publish("pSensor", String(pSensor));
   }
 }
