@@ -8,15 +8,31 @@
 // PECMAC125A I2C address is 0x2A(42)
 SYSTEM_MODE(SEMI_AUTOMATIC);
 #define Addr 0x2A
+#define AddrP 0x50
 
+//IFTTT
+float pSensor;
+
+//Piezo ((Pvalues)
+long vibdat[4096][2];
+int i;
+int j;
+byte dataP[2];
+
+int raw_adc = 0;
+
+//Current Vars
 byte data[36];
 int typeOfSensor = 0;
 int maxCurrent = 0;
 int noOfChannel = 0;
 float current = 0.0;
-void setup()
 
-{
+void setup(){
+  //PValues Vars
+  Particle.variable("i2cdevice", "ADC121C021");
+  Particle.variable("rawADC", raw_adc);
+
   // Initialise I2C communication as MASTER
   Wire.begin();
   // Initialise Serial Communication, set baud rate = 9600
@@ -24,6 +40,7 @@ void setup()
 
   // Start I2C transmission
   Wire.beginTransmission(Addr);
+  Wire.beginTransmission(AddrP);
   // Command header byte-1
   Wire.write(0x92);
   // Command header byte-2
@@ -63,12 +80,54 @@ void setup()
   // Output data to dashboard
   Serial.printf("Type of Sensor %i \n",typeOfSensor);
   Serial.printf("Max Current: %i \n", maxCurrent);
-  Serial.printf("No. of Channels: %i 'n", noOfChannel);
-  delay(5000);
+  //Serial.printf("No. of Channels: %i 'n", noOfChannel);
+  //delay(5000);
 }
 
 void loop()
 {
+  ////////////////////////////////////////
+  //PValues Loop
+  delay(100);
+  for(i=0;i<4096;i++) {
+    // Start I2C transmission
+    //Wire.beginTransmission(AddrP);  
+    // Calling conversion result register, 0x00(0)
+    Wire.write(0x00);
+    // Stop I2C transmission
+    Wire.endTransmission();
+
+    // Request 2 bytes
+    Wire.requestFrom(AddrP, 2);
+    
+    // Read 2 bytes of data, raw_adc msb, raw_adc lsb
+    if(Wire.available() == 2)
+    {  
+        dataP[0] = Wire.read();
+        dataP[1] = Wire.read();
+    }
+    
+    // Convert the data to 12 bits
+    raw_adc = ((dataP[0] * 256) + dataP[1]) & 0x0FFF;
+
+    vibdat[i][0] = micros();
+    vibdat[i][1] = raw_adc;
+    //delay(9);
+    
+}
+//for(j=0;j<4096;j++) {
+    //Serial.print(vibdat[j][0]);
+    //Serial.print(",");
+    //Serial.println(vibdat[j][1]);
+    //Serial.print(".");
+//    }
+
+//delayMicroseconds(500);
+
+
+  /////////////////////////////////////////
+  //Current Loop
+
   for (int j = 1; j < noOfChannel + 1; j++)
   {
     // Start I2C Transmission
@@ -109,5 +168,7 @@ void loop()
     // Output data to dashboard
     Serial.printf("Channel: %i \n", j);
     Serial.printf("Current Value: %0.2f \n", current); 
+    pSensor = current;
+    //Particle.publish("pSensor", String(pSensor));
   }
 }

@@ -55,16 +55,15 @@ void loop(void) {
 
   success = nfc.readPassiveTargetID(PN532_MIFARE_ISO14443A, uid, &uidLength);
   if (success) {
-    Serial.printf("\nSuccess \n");
+    Serial.printf("\nSuccess getting target ID \n");
 
     // Display some basic information about the card
     Serial.printf("Card Type ISO14443A card \n");
-    Serial.printf("UID Length: ");Serial.print(uidLength, DEC);Serial.printf(" bytes \n");
     Serial.printf("UID Value: ");
     nfc.PrintHex(uid, uidLength);
 
 
-    Serial.printf("..... \n");
+    Serial.printf("............. \n");
 
     if (uidLength == 4){
       Serial.printf("Mifare Classic Card \n");
@@ -74,7 +73,7 @@ void loop(void) {
       success = nfc.mifareclassic_AuthenticateBlock(uid, uidLength, 4, 0, keya);
 
       if (success){
-        Serial.printf("Sector 1 has been authenticated \n");
+        //Serial.printf("Sector 1 has been authenticated \n");
         uint8_t data[16];
 
         success = nfc.mifareclassic_ReadDataBlock(4, data);
@@ -84,11 +83,11 @@ void loop(void) {
           nfc.PrintHexChar(data, 16);
 
           correctKey = isMatched(uid, masterKey);
-          if (correctKey == true) {
-            printf("Valid Access Card \n"); 
+          if (correctKey == 1) {
+            Serial.printf("Valid Access Card \n"); 
           }
           else{
-            printf("Invalid Access Card \n"); 
+            Serial.printf("Invalid Access Card \n"); 
           }
         }
         else{
@@ -105,11 +104,13 @@ bool isMatched (uint8_t uid[4], uint8_t masterKey[4]) {
   int i;
   for(i=0; i < 4; i++){
     if(uid[i] != masterKey[i]){
-      Serial.printf("Invalid Key \n");
-      Serial.printf("Master key is {0x49, 0xB8, 0x2D, 0x7A}");
+      Serial.printf("*Invalid Key \n");
+      Serial.printf("Master key is {0x49, 0xB8, 0x2D, 0x7A} \n");
+      Serial.printf("Your UID Value: %i \n", uid);
+      //nfc.PrintHex(uid);
       return false;
     }
   }
-  Serial.printf("Valid Key \n");
+  Serial.printf("*Valid Key \n");
   return true;
 }
