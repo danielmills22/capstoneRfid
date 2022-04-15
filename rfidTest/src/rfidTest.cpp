@@ -73,7 +73,7 @@ void loop(void) {
     nfc.PrintHex(uid, uidLength);
 
 
-    Serial.printf("..... \n");
+    Serial.printf("............. \n");
 
     if (uidLength == 4){
       Serial.printf("Mifare Classic Card \n");
@@ -83,7 +83,7 @@ void loop(void) {
       success = nfc.mifareclassic_AuthenticateBlock(uid, uidLength, 4, 0, keya);
 
       if (success){
-        Serial.printf("Sector 1 has been authenticated \n");
+        //Serial.printf("Sector 1 has been authenticated \n");
         uint8_t data[16];
 
         success = nfc.mifareclassic_ReadDataBlock(4, data);
