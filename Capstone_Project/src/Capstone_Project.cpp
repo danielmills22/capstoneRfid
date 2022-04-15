@@ -365,7 +365,7 @@ bool isMatched (uint8_t uid[4], uint8_t masterKey[4]) {
       display.setCursor(0,0);           
       display.printf("Invalid Key - Access Denied"); //Outputs Switch Case Access
       display.display();
-      delay(1000);
+      //delay(1000);
 
       static bool powerAccess = FALSE;
       return false;
@@ -381,7 +381,7 @@ bool isMatched (uint8_t uid[4], uint8_t masterKey[4]) {
   display.setCursor(0,0);             
   display.printf("Valid Key - Access Granted");     //Output for Switch Case access
   display.display();
-  delay(1000);
+  //delay(1000);
 
   return true;
   static bool powerAccess = TRUE;
