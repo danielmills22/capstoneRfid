@@ -21,10 +21,12 @@ void loop();
 SYSTEM_MODE(SEMI_AUTOMATIC);
 
 //Var for Encoder
-Encoder myEnc(A3, A4);
+Encoder myEnc(D2, D3);
+const int SWITCHBUTTON = D4;
 int oldPosition;
 int newPosition;
 int encoderMap;
+int onOff;
 
 //Initialization
 #define OLED_RESET D4
@@ -49,9 +51,11 @@ void setup() {
   //display.printf(TimeOnly.c_str());
   display.display();
   delay(2000);
+
+  //Encoder
+  pinMode(SWITCHBUTTON, INPUT_PULLUP);
 }
 
-// loop() runs over and over again, as quickly as it can execute.
 void loop() { 
   //Data and Time Display
   //DateTime = Time.timeStr(); // Current Date and Time from Particle Time class
@@ -61,11 +65,14 @@ void loop() {
   //display.display();
   //display.clear();
 
+  onOff = digitalRead(SWITCHBUTTON);
+  Serial.printf("Switch button %i \n", onOff);
+
   int newPosition = myEnc.read();
   if (newPosition != oldPosition) {
     oldPosition = newPosition;
-    if (newPosition > 20){
-      myEnc.write(20);
+    if (newPosition > 19){
+      myEnc.write(19);
     }
     if (newPosition < 0){
       myEnc.write(0);

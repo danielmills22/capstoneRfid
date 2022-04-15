@@ -124,6 +124,6 @@ void loop()
 
     // Output data to dashboard
     //Serial.printf("Channel: %i \n", j);
-    Serial.printf("%i,%0.2f \n", millis(), current); 
+    Serial.printf("%0.2f \n", current); 
   }
 }

@@ -113,16 +113,16 @@ void loop()
     vibdat[i][1] = raw_adc;
 
 
-    Serial.printf("%i,%i\n",millis(), raw_adc);
-    //delay(9);
+    //Serial.printf("%i,%i\n",millis(), raw_adc);
+    delay(9);
     
 }
 //for(j=0;j<4096;j++) {
-    //Serial.print(vibdat[j][0]);
-    //Serial.print(",");
-    //Serial.println(vibdat[j][1]);
-    //Serial.print(".");
-//    }
+ //   Serial.print(vibdat[j][0]);
+ //   Serial.print(",");
+ //   Serial.println(vibdat[j][1]);
+ //   Serial.print(".");
+   // }
 
 //delayMicroseconds(500);
 
@@ -169,7 +169,7 @@ void loop()
 
     // Output data to dashboard
     //Serial.printf("Channel: %i \n", j);
-    //Serial.printf("%0.2f \n", current); 
+    Serial.printf("%0.2f \n", current); 
     //pSensor = current;
     //Particle.publish("pSensor", String(pSensor));
   }
