@@ -47,7 +47,7 @@ uint8_t valid;
 uint8_t masterKey[4] = {0x13, 0x99, 0xC9, 0x1E};
 uint8_t uidArray[4];
 bool correctKey;
-bool powerAccess;
+static bool powerAccess;
 
 //Button Vars
 const int BUTTONPIN1 = D5;  //sets encoder button to pin D5
@@ -96,8 +96,6 @@ void setup() {
   //display.printf(TimeOnly.c_str());
   display.display();
   delay(1000);
-
-  powerAccess = false;
 }
 
 
@@ -108,6 +106,8 @@ void loop() {
   
   ////////////////////////////////////////////
   ///////////////////////////////////////////
+
+  powerAccess = false;
   
   //Listens for input from button
   button1.Update();  
@@ -149,6 +149,12 @@ void loop() {
 
   encoderMap = map(newPosition, 0, 20, 0, 4);
 
+  display.clearDisplay();             //clears the display 
+  display.setCursor(0,0);             // Start at top-left corner
+  display.setTextColor(WHITE);
+  display.printf("MENU**:Turn and Click to Select \n Case0  \n Case1 \n Case2 \n Case3 \n Case4 \n ");   //Outputs Switch Case
+  display.display(); 
+
   // enter switch case
   switch(encoderMap)
   {
@@ -160,7 +166,7 @@ void loop() {
       display.clearDisplay();             //clears the display 
       display.setCursor(0,0);             // Start at top-left corner
       display.setTextColor(WHITE);
-      display.printf("Menu:Click to Select \n Case0 < \n Case1 \n Case2 \n Case3 \n Case4 \n ");   //Outputs Switch Case
+      display.printf("MENU:Click to Select \n Case0 < \n Case1 \n Case2 \n Case3 \n Case4 \n ");   //Outputs Switch Case
       display.display(); 
 
       if(function == -1){ 
@@ -177,7 +183,7 @@ void loop() {
       display.clearDisplay();      //clears the display 
       display.setTextColor(WHITE);
       display.setCursor(0,0);             // Start at top-left corner
-      display.printf("Menu: \n Case0 \n Case1 < \n Case2 \n Case3 \n Case4 ");   //Outputs Switch Case
+      display.printf("MENU: \n Case0 \n Case1 < \n Case2 \n Case3 \n Case4 ");   //Outputs Switch Case
       display.display();
 
       if(function == -1){ 
@@ -194,7 +200,7 @@ void loop() {
       display.clearDisplay();      //clears the display 
       display.setTextColor(WHITE);
       display.setCursor(0,0);             // Start at top-left corner
-      display.printf("Menu: \n Case0 \n Case1 \n Case2 < \n Case3 \n Case4 ");   //Outputs Switch Case
+      display.printf("MENU: \n Case0 \n Case1 \n Case2 < \n Case3 \n Case4 ");   //Outputs Switch Case
       display.display();
 
       if(function == -1){ 
@@ -211,7 +217,7 @@ void loop() {
       display.clearDisplay();             //clears the display
       display.setTextColor(WHITE); //sets the display color to white
       display.setCursor(0,0);             // Start at top-left corner
-      display.printf("Menu: \n Case0 \n Case1 \n Case2 \n Case3 < \n Case4 \n ");   //Outputs Switch Case
+      display.printf("MENU: \n Case0 \n Case1 \n Case2 \n Case3 < \n Case4 \n ");   //Outputs Switch Case
       display.display();   //shows the display
 
       if(function == -1){ 
@@ -228,7 +234,7 @@ void loop() {
       display.clearDisplay();             //clears the display
       display.setTextColor(WHITE);
       display.setCursor(0,0);             // Start at top-left corner
-      display.printf("Menu: \n Case0 \n Case1 \n Case2 \n Case3 \n Case4 < \n ");   //Outputs Switch Case
+      display.printf("MENU: \n Case0 \n Case1 \n Case2 \n Case3 \n Case4 < \n ");   //Outputs Switch Case
       display.display();
 
       if(function == -1){ 
@@ -331,7 +337,7 @@ void rfidCardRead(){
   Serial.printf("#####BREAK######");
 }
 
-//Function for Validating master card
+//Function for Validating master card 
 bool isMatched (uint8_t uid[4], uint8_t masterKey[4]) {
   int i;
   for(i=0; i < 4; i++){
@@ -340,24 +346,34 @@ bool isMatched (uint8_t uid[4], uint8_t masterKey[4]) {
       Serial.printf("Master key is {0x49, 0xB8, 0x2D, 0x7A} \n");
       Serial.printf("Your UID Value: %i \n", uid);
 
+   
+
+      display.clearDisplay();             
+      display.setTextColor(WHITE);
+      display.setCursor(0,0);           
+      display.printf("Invalid Key - Access Denied"); //Outputs Switch Case Access
+      display.display();
+      //delay(1000);
+
+      static bool powerAccess = FALSE;
       return false;
 
-      display.clearDisplay();             //clears the display
-      display.setTextColor(WHITE);
-      display.setCursor(0,0);             // Start at top-left corner
-      display.printf("Invalid Key - Access Denied");            //Outputs Switch Case
-      display.display(1000);
-
+      Serial.printf("PowerAccess %i \n", powerAccess);
+      delay(1000);
     }
   }
   Serial.printf("*Valid Key \n");
 
-  display.clearDisplay();             //clears the display
+  display.clearDisplay();            
   display.setTextColor(WHITE);
-  display.setCursor(0,0);             // Start at top-left corner
-  display.printf("Valid Key - Access Granted");            //Outputs Switch Case
-  display.display(1000);
+  display.setCursor(0,0);             
+  display.printf("Valid Key - Access Granted");     //Output for Switch Case access
+  display.display();
+  //delay(1000);
 
-  powerAccess = TRUE;
   return true;
+  static bool powerAccess = TRUE;
+
+  Serial.printf("PowerAccess %i \n", powerAccess);
+  delay(1000);
 }
