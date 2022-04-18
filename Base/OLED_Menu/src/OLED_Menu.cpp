@@ -26,7 +26,6 @@ Encoder myEnc(D2, D3);
 int oldPosition;
 int newPosition;
 int encoderMap;
-//int onOff;
 
 //Initialization
 #define OLED_RESET D4
@@ -106,7 +105,11 @@ void loop() {
         display.printf("Menu: \n Case0 < \n Case1 \n Case2 \n Case3 \n Case4 \n ");   //Outputs Switch Case
         display.display();  
 
-        function = 0;       
+          if(function == -1){ 
+            Serial.printf("SINGLE LONG click \n");  //for testing
+            function = 0;
+          }
+        Serial.printf("Function %i", function);
       break;
       case 1: 
         if(function == 1){ 

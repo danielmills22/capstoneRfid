@@ -29,10 +29,6 @@ int noOfChannel = 0;
 float current = 0.0;
 
 void setup(){
-  //PValues Vars
-  Particle.variable("i2cdevice", "ADC121C021");
-  Particle.variable("rawADC", raw_adc);
-
   // Initialise I2C communication as MASTER
   Wire.begin();
   // Initialise Serial Communication, set baud rate = 9600

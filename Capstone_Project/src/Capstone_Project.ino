@@ -47,12 +47,44 @@ uint8_t valid;
 uint8_t masterKey[4] = {0x13, 0x99, 0xC9, 0x1E};
 uint8_t uidArray[4];
 bool correctKey;
-static bool powerAccess;
+bool powerAccess;
 
 //Button Vars
 const int BUTTONPIN1 = D5;  //sets encoder button to pin D5
 ClickButton button1(BUTTONPIN1, LOW, CLICKBTN_PULLUP);  //clickbutton object for encoder
 int function = 0;  //set button to zero
+
+///////////////
+//Vars For Current and Vibration
+// PECMAC125A I2C address is 0x2A(42) //Piezo is 0x5-
+#define Addr 0x2A
+#define AddrP 0x50
+
+//Piezo ((Pvalues)
+long vibdat[4096][2];
+int i;
+int j;
+byte dataP[2];
+
+int raw_adc = 0;
+
+//Current Vars
+byte data[36];
+int typeOfSensor = 0;
+int maxCurrent = 0;
+int noOfChannel = 0;
+float current = 0.0;
+
+//array vars
+float size;
+float a;
+float z;
+float b;
+float n;
+float num;
+
+//time vars
+int startTime;
 
 void setup() {
   Serial.begin(115200);
@@ -66,14 +98,9 @@ void setup() {
   nfc.begin();
   
   
-  ///////////////////////////////////////////////
   /////////////////////////////////////////////
   //Rfid
-
   rfidBegin();
- 
-  //////////////////////////////////////////////
-  //R/////////////////////////////////////////
   
   //Setting Time for button clicks -- measured in millis
   button1.debounceTime   = 15;   // Debounce timer in ms
@@ -84,31 +111,74 @@ void setup() {
   Time.zone(-7);
   Particle.syncTime();
 
+  powerAccess = false;
+
   //##Setup Information for the OLED
   display.begin(SSD1306_SWITCHCAPVCC, 0x3c);  // initialize with the I2C addr 0x3D (for the 128x64)
   display.display(); // show splashscreen
-  display.clearDisplay();
+
+  
   display.setTextSize(1);
+  display.clearDisplay();             //clears the display 
+  display.setCursor(0,0);             // Start at top-left corner
   display.setTextColor(WHITE);
-  display.setCursor(0,0);
-  display.printf("Monitoring System \n");
-  //display.printf(DateTime.c_str());
-  //display.printf(TimeOnly.c_str());
-  display.display();
-  delay(1000);
+  display.printf("Please Scan Card");   //Outputs Switch Case
+  display.display(); 
+
+  //Setup for Reading Current and Piezo through I2C
+  // Initialise I2C communication as MASTER
+  Wire.begin();
+  // Initialise Serial Communication, set baud rate = 9600
+  Serial.begin(9600);
+
+  // Start I2C transmission
+  Wire.beginTransmission(Addr);
+  // Command header byte-1
+  Wire.write(0x92);
+  // Command header byte-2
+  Wire.write(0x6A);
+  // Command 2 is used to read no of sensor type, Max current, No. of channel
+  Wire.write(0x02);
+  // Reserved
+  Wire.write(0x00);
+  // Reserved
+  Wire.write(0x00);
+  // Reserved
+  Wire.write(0x00);
+  // Reserved
+  Wire.write(0x00);
+  // CheckSum
+  Wire.write(0xFE);
+  // Stop I2C transmission
+  Wire.endTransmission();
+
+  // Request 6 bytes of data
+  Wire.requestFrom(Addr, 6);
+
+  // Read 6 bytes of data
+  if (Wire.available() == 6)
+  {
+    data[0] = Wire.read();
+    data[1] = Wire.read();
+    data[2] = Wire.read();
+    data[3] = Wire.read();
+    data[4] = Wire.read();
+    data[5] = Wire.read();
+  }
+  typeOfSensor = data[0];
+  maxCurrent = data[1];
+  noOfChannel = data[2];
+
+  // Output data to dashboard
+  //Serial.printf("Type of Sensor %i \n",typeOfSensor);
+  //Serial.printf("Max Current: %i \n", maxCurrent);
+  //Serial.printf("No. of Channels: %i 'n", noOfChannel);
+  //delay(5000);
 }
 
 
 void loop() {
-  ////////////////////////////////////////////
-  ///////////////////////////////////////////
-  //RFid Loop
-  
-  ////////////////////////////////////////////
-  ///////////////////////////////////////////
-
-  powerAccess = false;
-  
+ 
   //Listens for input from button
   button1.Update();  
   if(button1.clicks != 0) {
@@ -122,146 +192,194 @@ void loop() {
   //   //Particle.publish("pSensor", String(pSensor));
   //  startTime = millis();   
   // } 
-  display.clearDisplay();             //clears the display 
-  display.setCursor(0,0);             // Start at top-left corner
-  display.setTextColor(WHITE);
-  display.printf("Please Scan Card");   //Outputs Switch Case
-  display.display(); 
-
+  
   rfidCardRead();
   
-  ///////////////////////////////
   ///////////////////////////////
   //Info will only show if Access is granted
   if (powerAccess == TRUE){
 
-  //Encoder Info for Menu
-  int newPosition = myEnc.read();
-  if (newPosition != oldPosition) {
-    oldPosition = newPosition;
-    if (newPosition > 20){
-      myEnc.write(20);
+    //Encoder Info for Menu
+    int newPosition = myEnc.read();
+    if (newPosition != oldPosition) {
+      oldPosition = newPosition;
+      if (newPosition > 20){
+        myEnc.write(20);
+      }
+      if (newPosition < 0){
+        myEnc.write(0);
+      }
     }
-    if (newPosition < 0){
-      myEnc.write(0);
-    }
-  }
 
-  encoderMap = map(newPosition, 0, 20, 0, 4);
+    //maps the encoder to the Switch Case
+    encoderMap = map(newPosition, 0, 20, 0, 4);
 
-  display.clearDisplay();             //clears the display 
-  display.setCursor(0,0);             // Start at top-left corner
-  display.setTextColor(WHITE);
-  display.printf("MENU**:Turn and Click to Select \n Case0  \n Case1 \n Case2 \n Case3 \n Case4 \n ");   //Outputs Switch Case
-  display.display(); 
 
-  // enter switch case
-  switch(encoderMap)
-  {
-    //Start
-    case 0: 
-      if(function == 1){ 
-        Serial.printf("SINGLE click \n"); //for testing
-      }
-      display.clearDisplay();             //clears the display 
-      display.setCursor(0,0);             // Start at top-left corner
-      display.setTextColor(WHITE);
-      display.printf("MENU:Click to Select \n Case0 < \n Case1 \n Case2 \n Case3 \n Case4 \n ");   //Outputs Switch Case
-      display.display(); 
+    // enter switch case
+    switch(encoderMap)
+    {
+      //Start
+      case 0: 
 
-      if(function == -1){ 
-        Serial.printf("SINGLE LONG click \n");  //for testing
-      } 
+        display.clearDisplay();             //clears the display 
+        display.setCursor(0,0);             // Start at top-left corner
+        display.setTextColor(WHITE);
+        display.printf("MENU: \n-> Current Logging  \n Case1 \n Case2 \n Case3 \n Case4 \n ");   //Outputs Switch Case
+        display.display(); 
 
-      function = 0;       
-    break;
-    //Start
-    case 1: 
-      if(function == 1){ 
-        Serial.printf("SINGLE click \n"); //for testing
-      }
-      display.clearDisplay();      //clears the display 
-      display.setTextColor(WHITE);
-      display.setCursor(0,0);             // Start at top-left corner
-      display.printf("MENU: \n Case0 \n Case1 < \n Case2 \n Case3 \n Case4 ");   //Outputs Switch Case
-      display.display();
+        for (int j = 1; j < noOfChannel + 1; j++){
+        
+        //Commands for Reading Data
+        Wire.beginTransmission(Addr);
+        Wire.write(0x92);  //Command for byte-1
+        Wire.write(0x6A);  //Command for byt-2
+        Wire.write(0x01);
+        Wire.write(j);
+        Wire.write(j);
+        Wire.write(0x00);
+        Wire.write(0x00);
+        // CheckSum
+        Wire.write((0x92 + 0x6A + 0x01 + j + j + 0x00 + 0x00) & 0xFF);
+        // Stop I2C Transmission
+        Wire.endTransmission();
+    
+        // Request 3 bytes of data
+        Wire.requestFrom(Addr, 3);
 
-      if(function == -1){ 
-        Serial.printf("SINGLE LONG click \n");  //for testing
-      } 
+        // Read 3 bytes of data
+        // msb1, msb, lsb  
+        int msb1 = Wire.read();
+        int msb = Wire.read();
+        int lsb = Wire.read();
+        current = (msb1 * 65536) + (msb * 256) + lsb;
 
-      function = 0;
-    break;
-    //Start
-    case 2:
-      if(function == 1){ 
-        Serial.printf("SINGLE click \n"); //for testing
-      }
-      display.clearDisplay();      //clears the display 
-      display.setTextColor(WHITE);
-      display.setCursor(0,0);             // Start at top-left corner
-      display.printf("MENU: \n Case0 \n Case1 \n Case2 < \n Case3 \n Case4 ");   //Outputs Switch Case
-      display.display();
+        // Convert the data to ampere
+        current = current / 1000;
 
-      if(function == -1){ 
-        Serial.printf("SINGLE LONG click \n");  //for testing
-      } 
+        // Output data to dashboard
+        Serial.printf("Channel: %i \n", j);
+        Serial.printf("Current Value: %0.2f \n", current); 
+        }
 
-      function = 0;
-    break;
-    //Start of case 3
-    case 3:
-      if(function == 1){ 
-        Serial.printf("SINGLE click \n"); //for testing
-      }
-      display.clearDisplay();             //clears the display
-      display.setTextColor(WHITE); //sets the display color to white
-      display.setCursor(0,0);             // Start at top-left corner
-      display.printf("MENU: \n Case0 \n Case1 \n Case2 \n Case3 < \n Case4 \n ");   //Outputs Switch Case
-      display.display();   //shows the display
+        //if(function == -1){ 
+        //  Serial.printf("SINGLE LONG click \n");  //for testing
+        //  break;
+        //} 
 
-      if(function == -1){ 
-        Serial.printf("SINGLE LONG click \n");  //for testing
-      } 
+      break;
+      //Start
+      case 1: 
+ 
+        Serial.printf("Function %i \n", function);
 
-      function = 0;
-    break;
-    //Start of Case 4
-    case 4:
-      if(function == 1){ 
-        Serial.printf("SINGLE click \n"); //for testing
-      }
-      display.clearDisplay();             //clears the display
-      display.setTextColor(WHITE);
-      display.setCursor(0,0);             // Start at top-left corner
-      display.printf("MENU: \n Case0 \n Case1 \n Case2 \n Case3 \n Case4 < \n ");   //Outputs Switch Case
-      display.display();
+        if (function == 0){
+          display.clearDisplay();      //clears the display
+          display.setTextColor(WHITE);
+          display.setCursor(0,0);             // Start at top-left corner
+          display.printf("MENU: \n Case0 \n->Vib  \n Case2 \n Case3 \n Case4 ");   //Outputs Switch Case
+          display.display();
+        }
+        else{
+          ////////////////////////////////////////
+          //Loop For Getting Piezo Values
+          if (function == 1){//}
+            for(i=0;i<4096;i++) {
+            // Start I2C transmission
+            Wire.beginTransmission(AddrP);  
+            // Calling conversion result register, 0x00(0)
+            Wire.write(0x00);
+            // Stop I2C transmission
+            Wire.endTransmission();
 
-      if(function == -1){ 
-        Serial.printf("SINGLE LONG click \n");  //for testing
-      } 
+            // Request 2 bytes
+            Wire.requestFrom(AddrP, 2);
+    
+            // Read 2 bytes of data, raw_adc msb, raw_adc lsb
+            if(Wire.available() == 2)
+            {  
+              dataP[0] = Wire.read();
+              dataP[1] = Wire.read();
+            }
+    
+            // Convert the data to 12 bits
+            raw_adc = ((dataP[0] * 256) + dataP[1]) & 0x0FFF;
 
-      function = 0;
-    break;
-    default:
-      if(function == 1){ 
-        Serial.printf("SINGLE click \n"); //for testing
-      }
-      display.clearDisplay();             //clears the display
-      display.setTextColor(WHITE);
-      display.setCursor(0,0);             // Start at top-left corner
-      display.printf("Error");            //Outputs Switch Case
-      display.display();
+            vibdat[i][0] = micros();
+            vibdat[i][1] = raw_adc;
+
+            //12-bit Resolution output every 1 second
+            if ((millis() - startTime > 1000)){
+              Serial.printf("\n%i,%i\n",millis(), raw_adc);
+
+              display.clearDisplay();      //clears the display 
+              display.setTextColor(WHITE);
+              display.setCursor(0,0);             // Start at top-left corner
+              display.printf("Hold Down Button to Return to Menu");   //Prints values to OLED
+              display.printf("\n%i,%i\n", startTime, raw_adc);   //Prints values to OLED
+              display.display();
+
+              startTime = millis();
+            }
+          }
+          }
+        }
+
+        //for(j=0;j<4096;j++) {
+        //  Serial.print(vibdat[j][0]);
+        //  Serial.print(",");
+        //  Serial.println(vibdat[j][1]);
+        //  Serial.print(".");
+        //}
+
+
+
+        if(function == -1){ 
+          Serial.printf("SINGLE LONG click \n");  //for testing
+          function = 0;
+        } 
+      
+      break;
+      case 2:
+        display.clearDisplay();      //clears the display 
+        display.setTextColor(WHITE);
+        display.setCursor(0,0);             // Start at top-left corner
+        display.printf("MENU: \n Case0 \n Case1 \n->Case2  \n Case3 \n Case4 ");   //Outputs Switch Case
+        display.display();
+      break;
+      //Start of case 3
+      case 3:
+        display.clearDisplay();             //clears the display
+        display.setTextColor(WHITE); //sets the display color to white
+        display.setCursor(0,0);             // Start at top-left corner
+        display.printf("MENU: \n Case0 \n Case1 \n Case2 \n ->Case3 \n Case4 \n ");   //Outputs Switch Case
+        display.display();   //shows the display
+      break;
+      //Start of Case 4
+      case 4:
+        display.clearDisplay();             //clears the display
+        display.setTextColor(WHITE);
+        display.setCursor(0,0);             // Start at top-left corner
+        display.printf("MENU: \n Case0 \n Case1 \n Case2 \n Case3 \n ->Case4  \n ");   //Outputs Switch Case
+        display.display();
+      break;
+      default:
+     
+        //if(function == 1){ 
+        //  Serial.printf("SINGLE click \n"); //for testing
+        //}
+        //display.clearDisplay();             //clears the display
+        //display.setTextColor(WHITE);
+        //display.setCursor(0,0);             // Start at top-left corner
+        //display.printf("Error");            //Outputs Switch Case
+        //display.display();
   
-      if(function == -1){ 
-        Serial.printf("SINGLE LONG click \n");  //for testing
-      } 
+        //if(function == -1){ 
+        //  Serial.printf("SINGLE LONG click \n");  //for testing
+        //} 
 
-      function = 0;
-    break;
-    //function = 0;
-    oldPosition = encoderMap;
-  }
+      break;
+      oldPosition = encoderMap;
+    }
   }
 }
 
@@ -355,11 +473,11 @@ bool isMatched (uint8_t uid[4], uint8_t masterKey[4]) {
       display.display();
       //delay(1000);
 
-      static bool powerAccess = FALSE;
-      return false;
+      powerAccess = FALSE;
+      
 
       Serial.printf("PowerAccess %i \n", powerAccess);
-      delay(1000);
+      return false;
     }
   }
   Serial.printf("*Valid Key \n");
@@ -371,9 +489,21 @@ bool isMatched (uint8_t uid[4], uint8_t masterKey[4]) {
   display.display();
   //delay(1000);
 
-  return true;
-  static bool powerAccess = TRUE;
+  powerAccess = TRUE;
 
   Serial.printf("PowerAccess %i \n", powerAccess);
-  delay(1000);
+  return true;
 }
+
+//Function for sorting an array
+//void sortArray(){
+//  for (float a = 0; a < n; ++a){  //loops through values in an array
+//    for (z = a + 1; z < n; ++z){
+//      if (num[i] > num[j]){
+//        b = num[i];
+//        num[a] = num[j];
+//        num[z] = a;
+//      }
+//    }
+//  }
+//}

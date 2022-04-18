@@ -19,21 +19,18 @@ void loop();
 SYSTEM_MODE(SEMI_AUTOMATIC);
 
 
-// the Button
+//Button Vars
 const int BUTTONPIN1 = D5;
 ClickButton button1(BUTTONPIN1, LOW, CLICKBTN_PULLUP);
-
-// Button results 
 int function = 0;
 
 
 void setup()
 {
   Serial.begin(9600);
+ 
+  //Setting Time for button clicks -- measured in millis
   pinMode(BUTTONPIN1, INPUT_PULLUP);
-
-  // Setup button timers (all in milliseconds / ms)
-  // (These are default if not set, but changeable for convenience)
   button1.debounceTime   = 20;   // Debounce timer in ms
   button1.multiclickTime = 250;  // Time limit for multi clicks
   button1.longClickTime  = 1000; // time until "held-down clicks" register
@@ -42,37 +39,37 @@ void setup()
 
 void loop()
 {
-  // Update button state
+  //Listens for input from button
   button1.Update();
-
-  // Save click codes in LEDfunction, as click codes are reset at next Update()
   if(button1.clicks != 0) {
     function = button1.clicks;
   }
 
+  //Button Click Functions
   if(function == 1){ 
-      Serial.printf("SINGLE click");
+      Serial.printf("SINGLE click \n"); //for testing
   }
 
   if(function == 2){
-     Serial.printf("DOUBLE click");
+     Serial.printf("DOUBLE click \n");
   }
 
   if(function == 3){
-    Serial.printf("TRIPLE click");
+    Serial.printf("TRIPLE click \n");
   }
 
   if(function == -1){ 
-    Serial.printf("SINGLE LONG click");
+    Serial.printf("SINGLE LONG click \n");  //for testing
+    function = 0;
   }
 
   if(function == -2){ 
-    Serial.printf("DOUBLE LONG click");
+    Serial.printf("DOUBLE LONG click \n");
   }
 
   if(function == -3){
-     Serial.printf("TRIPLE LONG click");
+     Serial.printf("TRIPLE LONG click \n");
   }
   
-  function = 0;
+  Serial.printf("Function %i \n", function);
 }

@@ -51,6 +51,7 @@ void loop()
 
   if(function == -1){ 
     Serial.printf("SINGLE LONG click \n");  //for testing
+    function = 0;
   }
 
   if(function == -2){ 
@@ -61,5 +62,5 @@ void loop()
      Serial.printf("TRIPLE LONG click \n");
   }
   
-  function = 0;
+  Serial.printf("Function %i \n", function);
 }
