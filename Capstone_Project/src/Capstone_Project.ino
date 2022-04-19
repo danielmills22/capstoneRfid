@@ -107,7 +107,7 @@ Adafruit_MQTT_Subscribe mqttObj2 = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "
 void setup() {
   Serial.begin(115200);
 
-  attachInterrupt(D5, getMode, FALLING);
+  attachInterrupt(D5, getMode, RISING);
   
   //Setup For Rfid
   Serial.printf("Init Reader \n");
