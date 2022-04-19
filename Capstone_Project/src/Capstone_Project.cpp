@@ -16,6 +16,9 @@ void loop();
 void rfidBegin();
 void rfidCardRead();
 bool isMatched (uint8_t uid[4], uint8_t masterKey[4]);
+void getMode();
+void MQTT_connect();
+void piezoRead();
 #line 8 "c:/Users/Daniel/Documents/IoT/capstoneRfid/Capstone_Project/src/Capstone_Project.ino"
 SYSTEM_MODE(SEMI_AUTOMATIC);
 
@@ -57,18 +60,19 @@ uint8_t valid;
 
 //Validation System for Rfid
 uint8_t masterKey[4] = {0x13, 0x99, 0xC9, 0x1E};
+uint8_t masterKey2[4];
 uint8_t uidArray[4];
 bool correctKey;
 bool powerAccess;
 
 //Button Vars
-const int BUTTONPIN1 = D5;  //sets encoder button to pin D5
-ClickButton button1(BUTTONPIN1, LOW, CLICKBTN_PULLUP);  //clickbutton object for encoder
-int function = 0;  //set button to zero
+const int BUTTONPIN1 = D5;
+ClickButton button1(BUTTONPIN1, LOW, CLICKBTN_PULLUP);
+int function = 0;
 
-///////////////
+
 //Vars For Current and Vibration
-// PECMAC125A I2C address is 0x2A(42) //Piezo is 0x5-
+// PECMAC125A I2C address is 0x2A(42) //Piezo is 0x50
 #define Addr 0x2A
 #define AddrP 0x50
 
@@ -95,33 +99,56 @@ float b;
 float n;
 float num;
 
+//Mapping Values
+int x, y, c, d;
+static int xx, yy, cc, dd;
+    
 //time vars
 int startTime;
+int last;
+int lastTime2;
+
+//Connecting to Adafruit Webservice
+TCPClient TheClient; 
+
+// Setup the MQTT client class by passing in the WiFi client and MQTT server and login details. 
+Adafruit_MQTT_SPARK mqtt(&TheClient,AIO_SERVER,AIO_SERVERPORT,AIO_USERNAME,AIO_KEY);
+
+/**** Feeds *********/ 
+// Setup Feeds to publish or subscribe 
+Adafruit_MQTT_Publish mqttvib = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/vib");
+Adafruit_MQTT_Publish mqttcurrent = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/current");
+Adafruit_MQTT_Subscribe mqttObj2 = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "/feeds/PowerState");  
 
 void setup() {
   Serial.begin(115200);
-  
-  //Setting the Pinmode
-  pinMode(BUTTONPIN1, INPUT_PULLUP);
-  //pinMode(PIEZOSENSORPIN, INPUT); //pin for collecting data from Pressure data from Piezo Sensor
 
+  attachInterrupt(D5, getMode, RISING);
+  
   //Setup For Rfid
   Serial.printf("Init Reader \n");
   nfc.begin();
-  
   
   /////////////////////////////////////////////
   //Rfid
   rfidBegin();
   
   //Setting Time for button clicks -- measured in millis
-  button1.debounceTime   = 15;   // Debounce timer in ms
-  button1.multiclickTime = 250;  // Time limit for multi clicks
-  button1.longClickTime  = 1000; // time until "held-down clicks" register
+  pinMode(BUTTONPIN1, INPUT_PULLUP);
+  //button1.debounceTime   = 20;   // Debounce timer in ms
+  //button1.multiclickTime = 250;  // Time limit for multi clicks
+  //button1.longClickTime  = 1000; // time until "held-down clicks" register
+
 
   //Getting Time Info -- This is for if info wanted to be recorded with the date
   Time.zone(-7);
   Particle.syncTime();
+
+  //Connect to Wifi
+  WiFi.connect();
+  while(WiFi.connecting()){
+    Serial.printf(".");
+  }
 
   powerAccess = false;
 
@@ -190,14 +217,49 @@ void setup() {
 
 
 void loop() {
- 
-  //Listens for input from button
-  button1.Update();  
-  if(button1.clicks != 0) {
-    function = button1.clicks;
+
+  //*MQTT Start
+  MQTT_connect();
+  // Ping MQTT Broker every 2 minutes to keep connection alive
+  if ((millis()-last)>120000) {               //function to ping the MQTT broker
+      Serial.printf("Pinging MQTT \n");             
+      if(! mqtt.ping()) {
+        Serial.printf("Disconnecting \n");
+        mqtt.disconnect();
+      }
+    last = millis();
+  }
+
+  ////Current Reader
+  for (int j = 1; j < noOfChannel + 1; j++){
+    //Commands for Reading Data
+    Wire.beginTransmission(Addr);
+    Wire.write(0x92);  //Command for byte-1
+    Wire.write(0x6A);  //Command for byt-2
+    Wire.write(0x01);
+    Wire.write(j);
+    Wire.write(j);
+    Wire.write(0x00);
+    Wire.write(0x00);
+    // CheckSum
+    Wire.write((0x92 + 0x6A + 0x01 + j + j + 0x00 + 0x00) & 0xFF);
+    // Stop I2C Transmission
+    Wire.endTransmission();
+    
+    // Request 3 bytes of data
+    Wire.requestFrom(Addr, 3);
+
+    // Read 3 bytes of data
+    // msb1, msb, lsb  
+    int msb1 = Wire.read();
+    int msb = Wire.read();
+    int lsb = Wire.read();
+    current = (msb1 * 65536) + (msb * 256) + lsb;
+
+    // Convert the data to ampere
+    current = current / 1000;
   }
   
-
   //pSensor = analogRead(PIEZOSENSORPIN);   //reads the vibration sensor values without the use of I2C
   //if((millis()-startTime) > 500) {   
   //   Serial.printf("StartTime %i | Vibs %.02f \n", startTime, pSensor);
@@ -206,7 +268,13 @@ void loop() {
   // } 
   
   rfidCardRead();
-  
+
+  //Listens for input from button
+  //button1.Update();
+  //if(button1.clicks != 0) {
+  //  function = button1.clicks;
+  //}
+
   ///////////////////////////////
   //Info will only show if Access is granted
   if (powerAccess == TRUE){
@@ -214,6 +282,7 @@ void loop() {
     //Encoder Info for Menu
     int newPosition = myEnc.read();
     if (newPosition != oldPosition) {
+      function = 0;
       oldPosition = newPosition;
       if (newPosition > 20){
         myEnc.write(20);
@@ -224,115 +293,93 @@ void loop() {
     }
 
     //maps the encoder to the Switch Case
-    encoderMap = map(newPosition, 0, 20, 0, 4);
+    encoderMap = map(newPosition, 0, 20, 0, 2);
 
-
-    // enter switch case
+     // enter switch case
     switch(encoderMap)
     {
       //Start
       case 0: 
+        if (function == 0){
+          display.clearDisplay();             //clears the display 
+          display.setCursor(0,0);             // Start at top-left corner
+          display.setTextColor(WHITE);
+          display.printf("MENU: \n->Current Read  \nVib Read \nPublish Values \n");   //Outputs Switch Case
+          display.display(); 
+        }
+        else{
+          if(function == 1){ 
+            display.clearDisplay();             //clears the display 
+            display.setCursor(0,0);             // Start at top-left corner
+            display.setTextColor(WHITE);
+            display.printf("Channel: %i \n", j);
+            display.printf("Current Value: %0.2f \n", current); 
+            display.display();
+          }
+        }
 
-        display.clearDisplay();             //clears the display 
-        display.setCursor(0,0);             // Start at top-left corner
-        display.setTextColor(WHITE);
-        display.printf("MENU: \n-> Current Logging  \n Case1 \n Case2 \n Case3 \n Case4 \n ");   //Outputs Switch Case
-        display.display(); 
-
-        for (int j = 1; j < noOfChannel + 1; j++){
-        
-        //Commands for Reading Data
-        Wire.beginTransmission(Addr);
-        Wire.write(0x92);  //Command for byte-1
-        Wire.write(0x6A);  //Command for byt-2
-        Wire.write(0x01);
-        Wire.write(j);
-        Wire.write(j);
-        Wire.write(0x00);
-        Wire.write(0x00);
-        // CheckSum
-        Wire.write((0x92 + 0x6A + 0x01 + j + j + 0x00 + 0x00) & 0xFF);
-        // Stop I2C Transmission
-        Wire.endTransmission();
-    
-        // Request 3 bytes of data
-        Wire.requestFrom(Addr, 3);
-
-        // Read 3 bytes of data
-        // msb1, msb, lsb  
-        int msb1 = Wire.read();
-        int msb = Wire.read();
-        int lsb = Wire.read();
-        current = (msb1 * 65536) + (msb * 256) + lsb;
-
-        // Convert the data to ampere
-        current = current / 1000;
-
+        //if(function == 1){ 
+        //  Serial.printf("SINGLE click \n"); //for testing
+        //}
+       
         // Output data to dashboard
         Serial.printf("Channel: %i \n", j);
         Serial.printf("Current Value: %0.2f \n", current); 
+
+        //Second Click ends logging and returns to menu
+        if(function == -1){ 
+          Serial.printf("SINGLE LONG click \n");  //for testing
+          function = 0;
+          break;
         }
-
-        //if(function == -1){ 
-        //  Serial.printf("SINGLE LONG click \n");  //for testing
-        //  break;
-        //} 
-
+        Serial.printf("Function %i", function);
       break;
       //Start
       case 1: 
- 
         Serial.printf("Function %i \n", function);
 
         if (function == 0){
           display.clearDisplay();      //clears the display
           display.setTextColor(WHITE);
           display.setCursor(0,0);             // Start at top-left corner
-          display.printf("MENU: \n Case0 \n->Vib  \n Case2 \n Case3 \n Case4 ");   //Outputs Switch Case
+          display.printf("MENU: \nCurrent Read \n->Vib Read  \nPublish Values \n");   //Outputs Switch Case
           display.display();
         }
         else{
-          ////////////////////////////////////////
-          //Loop For Getting Piezo Values
-          if (function == 1){//}
-            for(i=0;i<4096;i++) {
-            // Start I2C transmission
-            Wire.beginTransmission(AddrP);  
-            // Calling conversion result register, 0x00(0)
-            Wire.write(0x00);
-            // Stop I2C transmission
-            Wire.endTransmission();
-
-            // Request 2 bytes
-            Wire.requestFrom(AddrP, 2);
-    
-            // Read 2 bytes of data, raw_adc msb, raw_adc lsb
-            if(Wire.available() == 2)
-            {  
-              dataP[0] = Wire.read();
-              dataP[1] = Wire.read();
-            }
-    
-            // Convert the data to 12 bits
-            raw_adc = ((dataP[0] * 256) + dataP[1]) & 0x0FFF;
-
-            vibdat[i][0] = micros();
-            vibdat[i][1] = raw_adc;
-
+          piezoRead();  // function collects values from the piezo sensor
+          if (function == 1){
             //12-bit Resolution output every 1 second
             if ((millis() - startTime > 1000)){
               Serial.printf("\n%i,%i\n",millis(), raw_adc);
+              if(raw_adc >= 0 && raw_adc <= 25 ){
+                xx = 0;
+                xx = x++;
+              }
+              if(raw_adc >= 26 && raw_adc <= 50 ){
+                yy = 0;
+                yy = y++;
+              }
+              if(raw_adc >= 51 && raw_adc <=  75){
+                cc = 0;
+                cc = c++;
+              }
+              if(raw_adc >= 76){
+                dd = 0;
+                dd = d++;
+              }
 
               display.clearDisplay();      //clears the display 
               display.setTextColor(WHITE);
               display.setCursor(0,0);             // Start at top-left corner
-              display.printf("Hold Down Button to Return to Menu");   //Prints values to OLED
-              display.printf("\n%i,%i\n", startTime, raw_adc);   //Prints values to OLED
+              display.printf("Hold Button To Escape \n");   //Prints values to OLED
+              display.printf("Vib Values: %i\n", raw_adc);   //Prints values to OLED
+              display.printf("0-25:  %i\n", xx);   //Prints values to OLED
+              display.printf("26-50: %i\n", yy);   //Prints values to OLED
+              display.printf("51-75: %i\n", cc);   //Prints values to OLED
+              display.printf("Vib > 76:%i\n", dd);   //Prints values to OLED
               display.display();
-
               startTime = millis();
             }
-          }
           }
         }
 
@@ -343,35 +390,53 @@ void loop() {
         //  Serial.print(".");
         //}
 
+        if(function == -1){ 
+          Serial.printf("SINGLE LONG click \n");  //for testing
+          function = 0;
+          break;
+        } 
+      break;
+      case 2:
+        Serial.printf("Function %i \n", function);
 
+        if (function == 0){
+          display.clearDisplay();      //clears the display 
+          display.setTextColor(WHITE);
+          display.setCursor(0,0);             // Start at top-left corner
+          display.printf("MENU: \nCurrent Read \nVib Read \n->Publish Values  \n ");   //Outputs Switch Case
+          display.display();
+        }
+        else{
+          if (function == 1){  
+            piezoRead();  // function collects values from the piezo sensor
+            //*Reads and Publishes Values to Adafruit 
+            if((millis()-lastTime2 > 2000)) {
+              if(mqtt.Update()) {  //starts MQTT updats
+                mqttcurrent.publish(current);                                         //publishes the current values  Adafruit
+                Serial.printf("Publishing Current %0.2f \n", current);             //prints current values to serial monitor
+                mqttvib.publish(raw_adc);                                          //pub the piezo values
+                Serial.printf("Publishing Vib %i \n", raw_adc);              //prints piezo to serial monitor
+                
+                //Prints Values to the OLED
+                display.clearDisplay();      //clears the display 
+                display.setTextColor(WHITE);
+                display.setCursor(0,0);             // Start at top-left corner
+                display.printf("Publishing Current: \n"); 
+                display.printf("%0.2f \n", current);  
+                display.printf("Publishing Vib: %i \n", raw_adc); 
+                display.printf("%i \n", raw_adc); 
+                display.display();
+              }
+              lastTime2 = millis();
+            }
+          }
+        }
 
         if(function == -1){ 
           Serial.printf("SINGLE LONG click \n");  //for testing
           function = 0;
+          break;
         } 
-      break;
-      case 2:
-        display.clearDisplay();      //clears the display 
-        display.setTextColor(WHITE);
-        display.setCursor(0,0);             // Start at top-left corner
-        display.printf("MENU: \n Case0 \n Case1 \n->Case2  \n Case3 \n Case4 ");   //Outputs Switch Case
-        display.display();
-      break;
-      //Start of case 3
-      case 3:
-        display.clearDisplay();             //clears the display
-        display.setTextColor(WHITE); //sets the display color to white
-        display.setCursor(0,0);             // Start at top-left corner
-        display.printf("MENU: \n Case0 \n Case1 \n Case2 \n ->Case3 \n Case4 \n ");   //Outputs Switch Case
-        display.display();   //shows the display
-      break;
-      //Start of Case 4
-      case 4:
-        display.clearDisplay();             //clears the display
-        display.setTextColor(WHITE);
-        display.setCursor(0,0);             // Start at top-left corner
-        display.printf("MENU: \n Case0 \n Case1 \n Case2 \n Case3 \n ->Case4  \n ");   //Outputs Switch Case
-        display.display();
       break;
       default:
      
@@ -387,13 +452,14 @@ void loop() {
         //if(function == -1){ 
         //  Serial.printf("SINGLE LONG click \n");  //for testing
         //} 
-
+      function = 0;
       break;
       oldPosition = encoderMap;
     }
   }
 }
 
+   
 
 ///////////////////////////
 //////////////////////////
@@ -450,6 +516,8 @@ void rfidCardRead(){
           nfc.PrintHexChar(data, 16);
 
           correctKey = isMatched(uid, masterKey);
+          //correctKey = isMatched(uid, masterKey2);
+          
           if (correctKey == 1) {
             Serial.printf("Valid Access Card \n"); 
           }
@@ -472,10 +540,9 @@ bool isMatched (uint8_t uid[4], uint8_t masterKey[4]) {
   for(i=0; i < 4; i++){
     if(uid[i] != masterKey[i]){
       Serial.printf("*Invalid Key \n");
-      Serial.printf("Master key is {0x49, 0xB8, 0x2D, 0x7A} \n");
+      Serial.printf(" \n");
       Serial.printf("Your UID Value: %i \n", uid);
 
-   
 
       display.clearDisplay();             
       display.setTextColor(WHITE);
@@ -505,6 +572,61 @@ bool isMatched (uint8_t uid[4], uint8_t masterKey[4]) {
   Serial.printf("PowerAccess %i \n", powerAccess);
   return true;
 }
+
+//Function for changing button state
+void getMode(){
+  function++;
+  if(function == 2){
+    function = -1;
+  }
+}
+
+
+// Function to connect and reconnect as necessary to the MQTT server.
+void MQTT_connect() {  //this function is important to include for connecting to MQTT
+  int8_t ret;
+  // Stop if already connected.
+  if (mqtt.connected()) {
+    return;
+  }
+  Serial.print("Connecting to MQTT... ");
+  while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
+      Serial.printf("%s\n",(char *)mqtt.connectErrorString(ret));
+      Serial.printf("Retrying MQTT connection in 5 seconds..\n");
+      mqtt.disconnect();
+      delay(5000);  // wait 5 seconds
+  }
+  Serial.printf("MQTT Connected!\n");   //output for if connection was successful
+}
+
+void piezoRead(){
+  ///////////////////////////////
+  //Loop For Getting Piezo Values
+  for(i=0;i<4096;i++) {
+    // Start I2C transmission
+    Wire.beginTransmission(AddrP);  
+    // Calling conversion result register, 0x00(0)
+    Wire.write(0x00);
+    // Stop I2C transmission
+    Wire.endTransmission();
+
+    // Request 2 bytes
+    Wire.requestFrom(AddrP, 2);
+    
+    // Read 2 bytes of data, raw_adc msb, raw_adc lsb
+    if(Wire.available() == 2){  
+      dataP[0] = Wire.read();
+      dataP[1] = Wire.read();
+    }
+    
+    // Convert the data to 12 bits
+    raw_adc = ((dataP[0] * 256) + dataP[1]) & 0x0FFF;
+
+    vibdat[i][0] = micros();
+    vibdat[i][1] = raw_adc;            
+  }
+}
+
 
 //Function for sorting an array
 //void sortArray(){

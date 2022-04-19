@@ -53,6 +53,8 @@ void setup() {
   button1.multiclickTime = 250;  // Time limit for multi clicks
   button1.longClickTime  = 1000; // time until "held-down clicks" register
 
+  attachInterrupt(D5, getMode, RISING);
+
 }
 
 void loop() { 
@@ -65,7 +67,7 @@ void loop() {
   //display.clear();
 
   //Listens for input from button
-  button1.Update();
+  //button1.Update();
   if(button1.clicks != 0) {
     function = button1.clicks;
   }
@@ -169,6 +171,14 @@ void loop() {
     
     //function = 0;
     oldPosition = encoderMap;
+  }
+}
+
+/////////////////
+void getMode(){
+  function++;
+  if(function == 2){
+    function = -1;
   }
 }
 
