@@ -51,8 +51,8 @@ bool correctKey;
 bool powerAccess;
 
 //Button Vars
-const int BUTTONPIN1 = D5;
-ClickButton button1(BUTTONPIN1, LOW, CLICKBTN_PULLUP);
+const int BUTTONPIN2 = D5;
+//ClickButton button1(BUTTONPIN1, LOW, CLICKBTN_PULLUP);
 int function = 0;
 
 
@@ -107,7 +107,7 @@ Adafruit_MQTT_Subscribe mqttObj2 = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "
 void setup() {
   Serial.begin(115200);
 
-  attachInterrupt(D5, getMode, RISING);
+  attachInterrupt(D5, getMode, FALLING);
   
   //Setup For Rfid
   Serial.printf("Init Reader \n");
@@ -118,7 +118,7 @@ void setup() {
   rfidBegin();
   
   //Setting Time for button clicks -- measured in millis
-  pinMode(BUTTONPIN1, INPUT_PULLUP);
+  pinMode(BUTTONPIN2, INPUT_PULLUP);
   //button1.debounceTime   = 20;   // Debounce timer in ms
   //button1.multiclickTime = 250;  // Time limit for multi clicks
   //button1.longClickTime  = 1000; // time until "held-down clicks" register
@@ -129,10 +129,10 @@ void setup() {
   Particle.syncTime();
 
   //Connect to Wifi
-  WiFi.connect();
-  while(WiFi.connecting()){
-    Serial.printf(".");
-  }
+  //WiFi.connect();
+  //while(WiFi.connecting()){
+  //  Serial.printf(".");
+  //}
 
   powerAccess = false;
 

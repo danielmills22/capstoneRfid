@@ -66,8 +66,8 @@ bool correctKey;
 bool powerAccess;
 
 //Button Vars
-const int BUTTONPIN1 = D5;
-ClickButton button1(BUTTONPIN1, LOW, CLICKBTN_PULLUP);
+const int BUTTONPIN2 = D5;
+//ClickButton button1(BUTTONPIN1, LOW, CLICKBTN_PULLUP);
 int function = 0;
 
 
@@ -81,7 +81,6 @@ long vibdat[4096][2];
 int i;
 int j;
 byte dataP[2];
-
 int raw_adc = 0;
 
 //Current Vars
@@ -99,7 +98,7 @@ float b;
 float n;
 float num;
 
-//Mapping Values
+//Vibration Bin Sorting Values
 int x, y, c, d;
 static int xx, yy, cc, dd;
     
@@ -123,18 +122,18 @@ Adafruit_MQTT_Subscribe mqttObj2 = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "
 void setup() {
   Serial.begin(115200);
 
-  attachInterrupt(D5, getMode, RISING);
+  attachInterrupt(D5, getMode, FALLING);
   
   //Setup For Rfid
   Serial.printf("Init Reader \n");
   nfc.begin();
   
-  /////////////////////////////////////////////
+  ////////////
   //Rfid
   rfidBegin();
   
   //Setting Time for button clicks -- measured in millis
-  pinMode(BUTTONPIN1, INPUT_PULLUP);
+  pinMode(BUTTONPIN2, INPUT_PULLUP);
   //button1.debounceTime   = 20;   // Debounce timer in ms
   //button1.multiclickTime = 250;  // Time limit for multi clicks
   //button1.longClickTime  = 1000; // time until "held-down clicks" register
@@ -207,12 +206,6 @@ void setup() {
   typeOfSensor = data[0];
   maxCurrent = data[1];
   noOfChannel = data[2];
-
-  // Output data to dashboard
-  //Serial.printf("Type of Sensor %i \n",typeOfSensor);
-  //Serial.printf("Max Current: %i \n", maxCurrent);
-  //Serial.printf("No. of Channels: %i 'n", noOfChannel);
-  //delay(5000);
 }
 
 
@@ -371,7 +364,6 @@ void loop() {
               display.clearDisplay();      //clears the display 
               display.setTextColor(WHITE);
               display.setCursor(0,0);             // Start at top-left corner
-              display.printf("Hold Button To Escape \n");   //Prints values to OLED
               display.printf("Vib Values: %i\n", raw_adc);   //Prints values to OLED
               display.printf("0-25:  %i\n", xx);   //Prints values to OLED
               display.printf("26-50: %i\n", yy);   //Prints values to OLED
@@ -382,13 +374,6 @@ void loop() {
             }
           }
         }
-
-        //for(j=0;j<4096;j++) {
-        //  Serial.print(vibdat[j][0]);
-        //  Serial.print(",");
-        //  Serial.println(vibdat[j][1]);
-        //  Serial.print(".");
-        //}
 
         if(function == -1){ 
           Serial.printf("SINGLE LONG click \n");  //for testing
@@ -423,7 +408,7 @@ void loop() {
                 display.setCursor(0,0);             // Start at top-left corner
                 display.printf("Publishing Current: \n"); 
                 display.printf("%0.2f \n", current);  
-                display.printf("Publishing Vib: %i \n", raw_adc); 
+                display.printf("Publishing Vib: \n"); 
                 display.printf("%i \n", raw_adc); 
                 display.display();
               }
@@ -464,6 +449,7 @@ void loop() {
 ///////////////////////////
 //////////////////////////
 //Void Functions
+//Function Starts Rfid
 void rfidBegin(){
    uint32_t versiondata = nfc.getFirmwareVersion();
   if (! versiondata){
@@ -599,9 +585,10 @@ void MQTT_connect() {  //this function is important to include for connecting to
   Serial.printf("MQTT Connected!\n");   //output for if connection was successful
 }
 
+////////////////////////////
+//Function For Getting Piezo Values
 void piezoRead(){
-  ///////////////////////////////
-  //Loop For Getting Piezo Values
+
   for(i=0;i<4096;i++) {
     // Start I2C transmission
     Wire.beginTransmission(AddrP);  
@@ -628,15 +615,3 @@ void piezoRead(){
 }
 
 
-//Function for sorting an array
-//void sortArray(){
-//  for (float a = 0; a < n; ++a){  //loops through values in an array
-//    for (z = a + 1; z < n; ++z){
-//      if (num[i] > num[j]){
-//        b = num[i];
-//        num[a] = num[j];
-//        num[z] = a;
-//      }
-//    }
-//  }
-//}
