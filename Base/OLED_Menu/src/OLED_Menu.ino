@@ -49,9 +49,9 @@ void setup() {
 
   //Setting Time for button clicks -- measured in millis
   pinMode(BUTTONPIN1, INPUT_PULLUP);
-  button1.debounceTime   = 20;   // Debounce timer in ms
-  button1.multiclickTime = 250;  // Time limit for multi clicks
-  button1.longClickTime  = 1000; // time until "held-down clicks" register
+  //button1.debounceTime   = 20;   // Debounce timer in ms
+  //button1.multiclickTime = 250;  // Time limit for multi clicks
+  //button1.longClickTime  = 1000; // time until "held-down clicks" register
 
   attachInterrupt(D5, getMode, RISING);
 
@@ -108,13 +108,14 @@ void loop() {
         if(function == 1){ 
           Serial.printf("SINGLE click \n"); //for testing
         }
-        display.clearDisplay();      //clears the display 
-        display.setTextColor(WHITE);
-        display.setCursor(0,0);             // Start at top-left corner
-        display.printf("Menu: \n Case0 \n Case1 < \n Case2 \n Case3 \n Case4 ");   //Outputs Switch Case
-        display.display();
+        //display.clearDisplay();      //clears the display 
+        //display.setTextColor(WHITE);
+        //display.setCursor(0,0);             // Start at top-left corner
+        //display.printf("Menu: \n Case0 \n Case1 < \n Case2 \n Case3 \n Case4 ");   //Outputs Switch Case
+        //display.display();
+        //function = 0;
 
-        function = 0;
+        
       break;
      //Start of case 2
       case 2:

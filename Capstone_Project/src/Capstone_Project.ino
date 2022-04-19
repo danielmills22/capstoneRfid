@@ -5,7 +5,7 @@
  * Date:04-13-2022
  */
 
-SYSTEM_MODE(SEMI_AUTOMATIC);
+//SYSTEM_MODE(SEMI_AUTOMATIC);
 
 ///////////////////////////////
 //-----Include and Objects Block
@@ -33,10 +33,6 @@ int encoderMap;
 Adafruit_SSD1306 display(OLED_RESET);
 String DateTime, TimeOnly;
 
-// Piezo Sensor Var
-//const int PIEZOSENSORPIN = A4;      //pin for the pressure sensor
-//float pSensor;         //stores the piezo sensor readings
-
 //Rfid Vars
 const int PN532_IRQ  = A0;
 const int PN532_RESET = A1;  
@@ -52,12 +48,11 @@ bool powerAccess;
 
 //Button Vars
 const int BUTTONPIN2 = D5;
-//ClickButton button1(BUTTONPIN1, LOW, CLICKBTN_PULLUP);
 int function = 0;
 
 
 //Vars For Current and Vibration
-// PECMAC125A I2C address is 0x2A(42) //Piezo is 0x50
+//PECMAC125A I2C address is 0x2A(42) //Piezo is 0x50
 #define Addr 0x2A
 #define AddrP 0x50
 
@@ -67,6 +62,8 @@ int i;
 int j;
 byte dataP[2];
 int raw_adc = 0;
+
+float pSensor;         //stores the piezo sensor readings for google sheet
 
 //Current Vars
 byte data[36];
@@ -102,37 +99,34 @@ Adafruit_MQTT_SPARK mqtt(&TheClient,AIO_SERVER,AIO_SERVERPORT,AIO_USERNAME,AIO_K
 // Setup Feeds to publish or subscribe 
 Adafruit_MQTT_Publish mqttvib = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/vib");
 Adafruit_MQTT_Publish mqttcurrent = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/current");
+Adafruit_MQTT_Publish mqttuid = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/uid");
 Adafruit_MQTT_Subscribe mqttObj2 = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "/feeds/PowerState");  
 
 void setup() {
   Serial.begin(115200);
 
-  attachInterrupt(D5, getMode, RISING);
+  attachInterrupt(D5, getMode, FALLING);
   
   //Setup For Rfid
   Serial.printf("Init Reader \n");
   nfc.begin();
   
-  ////////////
+  //////
   //Rfid
   rfidBegin();
   
   //Setting Time for button clicks -- measured in millis
   pinMode(BUTTONPIN2, INPUT_PULLUP);
-  //button1.debounceTime   = 20;   // Debounce timer in ms
-  //button1.multiclickTime = 250;  // Time limit for multi clicks
-  //button1.longClickTime  = 1000; // time until "held-down clicks" register
-
 
   //Getting Time Info -- This is for if info wanted to be recorded with the date
   Time.zone(-7);
   Particle.syncTime();
 
   //Connect to Wifi
-  //WiFi.connect();
-  //while(WiFi.connecting()){
-  //  Serial.printf(".");
-  //}
+  WiFi.connect();
+  while(WiFi.connecting()){
+    Serial.printf(".");
+  }
 
   powerAccess = false;
 
@@ -149,36 +143,36 @@ void setup() {
   display.display(); 
 
   //Setup for Reading Current and Piezo through I2C
-  // Initialise I2C communication as MASTER
+  //Initialise I2C communication as MASTER
   Wire.begin();
   // Initialise Serial Communication, set baud rate = 9600
   Serial.begin(9600);
 
-  // Start I2C transmission
+  //Start I2C transmission
   Wire.beginTransmission(Addr);
-  // Command header byte-1
+  //Command header byte-1
   Wire.write(0x92);
-  // Command header byte-2
+  //Command header byte-2
   Wire.write(0x6A);
-  // Command 2 is used to read no of sensor type, Max current, No. of channel
+  //Command 2 is used to read no of sensor type, Max current, No. of channel
   Wire.write(0x02);
-  // Reserved
+  //Reserved
   Wire.write(0x00);
-  // Reserved
+  //Reserved
   Wire.write(0x00);
-  // Reserved
+  //Reserved
   Wire.write(0x00);
-  // Reserved
+  //Reserved
   Wire.write(0x00);
-  // CheckSum
+  //CheckSum
   Wire.write(0xFE);
-  // Stop I2C transmission
+  //Stop I2C transmission
   Wire.endTransmission();
 
-  // Request 6 bytes of data
+  //Request 6 bytes of data
   Wire.requestFrom(Addr, 6);
 
-  // Read 6 bytes of data
+  //Read 6 bytes of data
   if (Wire.available() == 6)
   {
     data[0] = Wire.read();
@@ -198,7 +192,7 @@ void loop() {
 
   //*MQTT Start
   MQTT_connect();
-  // Ping MQTT Broker every 2 minutes to keep connection alive
+  //Ping MQTT Broker every 2 minutes to keep connection alive
   if ((millis()-last)>120000) {               //function to ping the MQTT broker
       Serial.printf("Pinging MQTT \n");             
       if(! mqtt.ping()) {
@@ -237,21 +231,9 @@ void loop() {
     // Convert the data to ampere
     current = current / 1000;
   }
-  
-  //pSensor = analogRead(PIEZOSENSORPIN);   //reads the vibration sensor values without the use of I2C
-  //if((millis()-startTime) > 500) {   
-  //   Serial.printf("StartTime %i | Vibs %.02f \n", startTime, pSensor);
-  //   //Particle.publish("pSensor", String(pSensor));
-  //  startTime = millis();   
-  // } 
-  
+   
   rfidCardRead();
-
-  //Listens for input from button
-  //button1.Update();
-  //if(button1.clicks != 0) {
-  //  function = button1.clicks;
-  //}
+  
 
   ///////////////////////////////
   //Info will only show if Access is granted
@@ -295,10 +277,6 @@ void loop() {
             display.display();
           }
         }
-
-        //if(function == 1){ 
-        //  Serial.printf("SINGLE click \n"); //for testing
-        //}
        
         // Output data to dashboard
         Serial.printf("Channel: %i \n", j);
@@ -380,12 +358,15 @@ void loop() {
           if (function == 1){  
             piezoRead();  // function collects values from the piezo sensor
             //*Reads and Publishes Values to Adafruit 
-            if((millis()-lastTime2 > 2000)) {
+            if((millis()-lastTime2 > 5000)) {
               if(mqtt.Update()) {  //starts MQTT updats
-                mqttcurrent.publish(current);                                         //publishes the current values  Adafruit
+                mqttcurrent.publish(current);                                      //publishes the current values  Adafruit
                 Serial.printf("Publishing Current %0.2f \n", current);             //prints current values to serial monitor
                 mqttvib.publish(raw_adc);                                          //pub the piezo values
-                Serial.printf("Publishing Vib %i \n", raw_adc);              //prints piezo to serial monitor
+                Serial.printf("Publishing Vib %i \n", raw_adc);                    //prints piezo to serial monitor
+                pSensor = raw_adc;                                                 //reads the vibration sensor values and puts them into a var to send to google sheets
+                Particle.publish("pSensor", String(pSensor));
+                mqttuid.publish(uidArray[4]);
                 
                 //Prints Values to the OLED
                 display.clearDisplay();      //clears the display 
@@ -393,8 +374,9 @@ void loop() {
                 display.setCursor(0,0);             // Start at top-left corner
                 display.printf("Publishing Current: \n"); 
                 display.printf("%0.2f \n", current);  
-                display.printf("Publishing Vib: \n"); 
+                display.printf("Publishing Vibration:"); 
                 display.printf("%i \n", raw_adc); 
+                //display.printf("Publishing Vib to \n"); 
                 display.display();
               }
               lastTime2 = millis();
@@ -409,19 +391,6 @@ void loop() {
         } 
       break;
       default:
-     
-        //if(function == 1){ 
-        //  Serial.printf("SINGLE click \n"); //for testing
-        //}
-        //display.clearDisplay();             //clears the display
-        //display.setTextColor(WHITE);
-        //display.setCursor(0,0);             // Start at top-left corner
-        //display.printf("Error");            //Outputs Switch Case
-        //display.display();
-  
-        //if(function == -1){ 
-        //  Serial.printf("SINGLE LONG click \n");  //for testing
-        //} 
       function = 0;
       break;
       oldPosition = encoderMap;
@@ -509,7 +478,7 @@ void rfidCardRead(){
 bool isMatched (uint8_t uid[4], uint8_t masterKey[4]) {
   int i;
   for(i=0; i < 4; i++){
-    if(uid[i] != masterKey[i]){
+    if(uid[i] != masterKey[i] ){
       Serial.printf("*Invalid Key \n");
       Serial.printf(" \n");
       Serial.printf("Your UID Value: %i \n", uid);
@@ -549,6 +518,10 @@ void getMode(){
   function++;
   if(function == 2){
     function = -1;
+    Serial.printf("Inside -1(2c) %i \n", function);
+  }
+  if(function != 2){
+    Serial.printf("Outide Function 0(0c) %i \n", function);
   }
 }
 
@@ -599,4 +572,11 @@ void piezoRead(){
   }
 }
 
+
+//pSensor = analogRead(PIEZOSENSORPIN);   //reads the vibration sensor values without the use of I2C
+//if((millis()-startTime) > 500) {   
+//   Serial.printf("StartTime %i | Vibs %.02f \n", startTime, pSensor);
+//   //Particle.publish("pSensor", String(pSensor));
+//  startTime = millis();   
+// } 
 

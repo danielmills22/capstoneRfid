@@ -5,6 +5,8 @@
  * Date:    22-APR-2020
  */
 
+SYSTEM_MODE(SEMI_AUTOMATIC);
+
 // I2C address of the ADC121C021 0x50 
 #define Addr 0x2A
 #define AddrP 0x50
