@@ -5,7 +5,7 @@
  * Date:04-13-2022
  */
 
-SYSTEM_MODE(SEMI_AUTOMATIC);
+//SYSTEM_MODE(SEMI_AUTOMATIC);
 
 ///////////////////////////////
 //-----Include and Objects Block
@@ -384,6 +384,8 @@ void loop() {
         else{
           if (function == 1){  
             piezoRead();  // function collects values from the piezo sensor
+            pSensor = raw_adc;  
+            Particle.publish("pSensor", String(pSensor));  //reads the vibration sensor values and puts them into a var to send to google sheets
             //*Reads and Publishes Values to Adafruit 
             if((millis()-lastTime2 > 5000)) {
               if(mqtt.Update()) {  //starts MQTT updats
@@ -391,9 +393,7 @@ void loop() {
                 Serial.printf("Publishing Current %0.2f \n", current);             //prints current values to serial monitor
                 mqttvib.publish(raw_adc);                                          //pub the piezo values
                 Serial.printf("Publishing Vib %i \n", raw_adc);                    //prints piezo to serial monitor
-                pSensor = raw_adc;                                                 //reads the vibration sensor values and puts them into a var to send to google sheets
-                Particle.publish("pSensor", String(pSensor));
-                mqttuid.publish(uidArray[4]);
+                                                         
                 
                 //Prints Values to the OLED
                 display.clearDisplay();      //clears the display 

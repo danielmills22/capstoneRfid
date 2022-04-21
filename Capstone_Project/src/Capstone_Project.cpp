@@ -11,16 +11,7 @@
  * Date:04-13-2022
  */
 
-void setup();
-void loop();
-void rfidBegin();
-void rfidCardRead();
-bool isMatched (uint8_t uid[4], uint8_t masterKey[4]);
-void getMode();
-void MQTT_connect();
-void piezoRead();
-#line 8 "c:/Users/Daniel/Documents/IoT/capstoneRfid/Capstone_Project/src/Capstone_Project.ino"
-SYSTEM_MODE(SEMI_AUTOMATIC);
+//SYSTEM_MODE(SEMI_AUTOMATIC);
 
 ///////////////////////////////
 //-----Include and Objects Block
@@ -38,6 +29,15 @@ SYSTEM_MODE(SEMI_AUTOMATIC);
 #include <Adafruit_PN532.h>
 
 //Var for Encoder
+void setup();
+void loop();
+void rfidBegin();
+void rfidCardRead();
+bool isMatched (uint8_t uid[4], uint8_t masterKey[4]);
+void getMode();
+void MQTT_connect();
+void piezoRead();
+#line 26 "c:/Users/Daniel/Documents/IoT/capstoneRfid/Capstone_Project/src/Capstone_Project.ino"
 Encoder myEnc(D2, D3);
 int oldPosition;
 int newPosition;
@@ -399,6 +399,8 @@ void loop() {
         else{
           if (function == 1){  
             piezoRead();  // function collects values from the piezo sensor
+            pSensor = raw_adc;  
+            Particle.publish("pSensor", String(pSensor));  //reads the vibration sensor values and puts them into a var to send to google sheets
             //*Reads and Publishes Values to Adafruit 
             if((millis()-lastTime2 > 5000)) {
               if(mqtt.Update()) {  //starts MQTT updats
@@ -406,9 +408,7 @@ void loop() {
                 Serial.printf("Publishing Current %0.2f \n", current);             //prints current values to serial monitor
                 mqttvib.publish(raw_adc);                                          //pub the piezo values
                 Serial.printf("Publishing Vib %i \n", raw_adc);                    //prints piezo to serial monitor
-                pSensor = raw_adc;                                                 //reads the vibration sensor values and puts them into a var to send to google sheets
-                Particle.publish("pSensor", String(pSensor));
-                mqttuid.publish(uidArray[4]);
+                                                         
                 
                 //Prints Values to the OLED
                 display.clearDisplay();      //clears the display 
