@@ -106,6 +106,7 @@ int lastTime2;
 
 //Power Strip Var
 const int POWERSTRIP = A5;
+int Power;  //MQTT Power Button Var
 byte buf;
 
 //Connecting to Adafruit Webservice
@@ -119,7 +120,8 @@ Adafruit_MQTT_SPARK mqtt(&TheClient,AIO_SERVER,AIO_SERVERPORT,AIO_USERNAME,AIO_K
 Adafruit_MQTT_Publish mqttvib = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/vib");
 Adafruit_MQTT_Publish mqttcurrent = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/current");
 Adafruit_MQTT_Publish mqttuid = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/uid");
-Adafruit_MQTT_Subscribe mqttObj2 = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "/feeds/PowerState");  
+//Power 
+Adafruit_MQTT_Subscribe mqttPower = Adafruit_MQTT_Subscribe(&mqtt, AIO_USERNAME "/feeds/Power");  
 
 void setup() {
   Serial.begin(115200);
@@ -148,6 +150,9 @@ void setup() {
     Serial.printf(".");
   }
 
+  mqtt.subscribe(&mqttPower);  //subscribe to power button from Adafruit 
+
+  //Sets System Access False and turns the power off
   powerAccess = false;
   digitalWrite(POWERSTRIP, LOW);
 
@@ -221,6 +226,21 @@ void loop() {
         mqtt.disconnect();
       }
     last = millis();
+  }
+
+  //*MQTT Subscription
+  Adafruit_MQTT_Subscribe *subscription;                                             //looks for MQTT subscriptions for button input to turn on motor pump
+  while ((subscription = mqtt.readSubscription(100))) {                              //looks for receiving signal
+     if (subscription == &mqttPower) {
+        Power = atoi((char *)mqttPower.lastread);                                    //takes last data and converts it char and converts it to a float
+        Serial.printf("Received %i from Adafruit.io feed Power Button \n", Power);   //prints to screen
+     }
+  }
+
+  //Power Button
+  if (Power == 1){    //turns off the power if input was recieved from Adafruit
+    digitalWrite(POWERSTRIP, LOW);
+    Serial.printf("Power was turned off \n");
   }
 
   ////Current Reader
@@ -499,9 +519,7 @@ bool isMatched (uint8_t uid[4], uint8_t masterKey[4]) {
   int i;
   for(i=0; i < 4; i++){
     Serial.printf("%i", uid[i]);
-    sprintf((char *)buf, "%i%i%i%i \n", uid[i]);
-    Serial.printf("Array %i \n", buf);
-
+    
     if(uid[i] != masterKey[i] ){
       Serial.printf("*Invalid Key \n");
       Serial.printf(" \n");
