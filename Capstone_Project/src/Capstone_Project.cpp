@@ -11,7 +11,16 @@
  * Date:04-13-2022
  */
 
-//SYSTEM_MODE(SEMI_AUTOMATIC);
+void setup();
+void loop();
+void rfidBegin();
+void rfidCardRead();
+bool isMatched (uint8_t uid[4], uint8_t masterKey[4]);
+void getMode();
+void MQTT_connect();
+void piezoRead();
+#line 8 "c:/Users/Daniel/Documents/IoT/capstoneRfid/Capstone_Project/src/Capstone_Project.ino"
+SYSTEM_MODE(SEMI_AUTOMATIC);
 
 ///////////////////////////////
 //-----Include and Objects Block
@@ -29,15 +38,6 @@
 #include <Adafruit_PN532.h>
 
 //Var for Encoder
-void setup();
-void loop();
-void rfidBegin();
-void rfidCardRead();
-bool isMatched (uint8_t uid[4], uint8_t masterKey[4]);
-void getMode();
-void MQTT_connect();
-void piezoRead();
-#line 26 "c:/Users/Daniel/Documents/IoT/capstoneRfid/Capstone_Project/src/Capstone_Project.ino"
 Encoder myEnc(D2, D3);
 int oldPosition;
 int newPosition;
@@ -87,7 +87,7 @@ int maxCurrent = 0;
 int noOfChannel = 0;
 float current = 0.0;
 
-//array vars
+//array vars  -- //Pos
 float size;
 float a;
 float z;
@@ -103,6 +103,10 @@ static int xx, yy, cc, dd;
 int startTime;
 int last;
 int lastTime2;
+
+//Power Strip Var
+const int POWERSTRIP = A5;
+byte buf;
 
 //Connecting to Adafruit Webservice
 TCPClient TheClient; 
@@ -132,6 +136,7 @@ void setup() {
   
   //Setting Time for button clicks -- measured in millis
   pinMode(BUTTONPIN2, INPUT_PULLUP);
+  pinMode(POWERSTRIP, OUTPUT);
 
   //Getting Time Info -- This is for if info wanted to be recorded with the date
   Time.zone(-7);
@@ -144,6 +149,7 @@ void setup() {
   }
 
   powerAccess = false;
+  digitalWrite(POWERSTRIP, LOW);
 
   //##Setup Information for the OLED
   display.begin(SSD1306_SWITCHCAPVCC, 0x3c);  // initialize with the I2C addr 0x3D (for the 128x64)
@@ -248,6 +254,7 @@ void loop() {
   }
    
   rfidCardRead();
+
   
 
   ///////////////////////////////
@@ -449,8 +456,7 @@ void rfidCardRead(){
     Serial.printf("Card Type ISO14443A card \n");
     Serial.printf("UID Value: ");
     nfc.PrintHex(uid, uidLength);
-
-
+ 
     Serial.printf("............. \n");
 
     if (uidLength == 4){
@@ -471,8 +477,7 @@ void rfidCardRead(){
           nfc.PrintHexChar(data, 16);
 
           correctKey = isMatched(uid, masterKey);
-          //correctKey = isMatched(uid, masterKey2);
-          
+      
           if (correctKey == 1) {
             Serial.printf("Valid Access Card \n"); 
           }
@@ -493,6 +498,10 @@ void rfidCardRead(){
 bool isMatched (uint8_t uid[4], uint8_t masterKey[4]) {
   int i;
   for(i=0; i < 4; i++){
+    Serial.printf("%i", uid[i]);
+    sprintf((char *)buf, "%i%i%i%i \n", uid[i]);
+    Serial.printf("Array %i \n", buf);
+
     if(uid[i] != masterKey[i] ){
       Serial.printf("*Invalid Key \n");
       Serial.printf(" \n");
@@ -507,8 +516,9 @@ bool isMatched (uint8_t uid[4], uint8_t masterKey[4]) {
       //delay(1000);
 
       powerAccess = FALSE;
+      digitalWrite(POWERSTRIP, LOW);
       
-
+      Serial.printf("Power strip is OFF");
       Serial.printf("PowerAccess %i \n", powerAccess);
       return false;
     }
@@ -520,10 +530,11 @@ bool isMatched (uint8_t uid[4], uint8_t masterKey[4]) {
   display.setCursor(0,0);             
   display.printf("Valid Key - Access Granted");     //Output for Switch Case access
   display.display();
-  //delay(1000);
-
+ 
   powerAccess = TRUE;
+  digitalWrite(POWERSTRIP, HIGH);
 
+  Serial.printf("Power strip is ON");
   Serial.printf("PowerAccess %i \n", powerAccess);
   return true;
 }
